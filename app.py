@@ -29,6 +29,65 @@ def root():
     return 'hello there'
 
 
+@app.route('/lessons', methods=['POST', 'GET'], defaults={'course': None, 'lesson': None})
+@app.route('/lessons/<course>/<lesson>', methods=['PUT', 'DELETE'])
+@require_appkey
+def lessons(course, lesson):
+    mongo_lessons = mongo.db.lessons
+    teacheruser = user_name(request.args.get('key'))
+
+    # get all lessons for a course
+    if request.method == 'GET':
+        lessons_resp = mongo_lessons.find({'course_num': request.args.get('course_num'),
+                                           'teacheruser': teacheruser})
+        return json_util.dumps(lessons_resp)
+
+    # insert new lesson into a course
+    if request.method == 'POST':
+        existing_lesson = mongo_lessons.find_one({'number': request.args.get('number'),
+                                                  'course_num': request.args.get('course_num'),
+                                                  'teacheruser': teacheruser})
+        if existing_lesson is None:
+            mongo_lessons.insert({'number': request.args.get('number'),
+                                  'course_num': request.args.get('course_num'),
+                                  'title': request.args.get('title'),
+                                  'content': request.args.get('content'),
+                                  'teacheruser': teacheruser})
+            return 'Added'
+
+        return 'already exists!'
+
+    # update a lesson
+    if request.method == 'PUT':
+        existing_lesson = mongo_lessons.find_one({'number': lesson,
+                                                      'course_num': course,
+                                                      'teacheruser': teacheruser})
+        if existing_lesson is not None:
+            print(request.args)
+            mongo_lessons.update_one({'number': lesson,
+                                      'course_num': course,
+                                      'teacheruser': teacheruser},
+                                     {'$set': {'title': request.args.get('title'),
+                                               'content': request.args.get('content')}})
+
+            return 'Updated'
+
+        return 'Update failed'
+
+    # delete a lesson
+    if request.method == 'DELETE':
+        existing_lesson = mongo_lessons.find_one({'number': lesson,
+                                                  'course_num': course,
+                                                  'teacheruser': teacheruser})
+        if existing_lesson is not None:
+            mongo_lessons.delete_one({'number': lesson,
+                                      'course_num': course,
+                                      'teacheruser': teacheruser})
+            return 'Deleted'
+
+        return 'Delete failed'
+
+
 def obj_dict(obj):
     return obj.__dict__
 
